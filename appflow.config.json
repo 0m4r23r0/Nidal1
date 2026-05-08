@@ -1,0 +1,8 @@
+{
+  "default": {
+    "build": {
+      "platform": "android",
+      "type": "debug"
+    }
+  }
+}
