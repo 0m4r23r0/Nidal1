@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>Nidal</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+html,body{width:100%;height:100%;overflow:hidden;background:#FAEEDA}
+body{
+  display:flex;flex-direction:column;align-items:center;
+  padding-top:env(safe-area-inset-top);
+  padding-bottom:env(safe-area-inset-bottom);
+  padding-left:env(safe-area-inset-left);
+  padding-right:env(safe-area-inset-right);
+  touch-action:none;user-select:none;-webkit-user-select:none;
+}
+#ui-bar{
+  width:100%;max-width:560px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;
+  background:rgba(255,255,255,0.7);
+  border-bottom:1.5px solid rgba(186,117,23,0.3);
+  font-family:system-ui,sans-serif;
+  flex-shrink:0;
+}
+.ui-label{font-size:15px;color:#412402;font-weight:600;letter-spacing:0.2px}
+#lvl-badge{
+  background:#BA7517;color:#fff;
+  border-radius:10px;padding:5px 14px;
+  font-size:14px;font-weight:700;letter-spacing:0.5px;
+}
+#canvas-wrap{
+  position:relative;width:100%;max-width:560px;
+  flex:1;min-height:0;
+}
+canvas{display:block;width:100%;height:100%}
+#overlay{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(250,238,218,0.96);
+  text-align:center;padding:28px 24px;gap:16px;
+  font-family:system-ui,sans-serif;
+}
+#overlay .ov-icon{font-size:56px;line-height:1}
+#overlay h2{font-size:26px;font-weight:700;color:#412402}
+#overlay p{font-size:15px;color:#633806;max-width:280px;line-height:1.65}
+#overlay button{
+  padding:16px 44px;background:#BA7517;color:#fff;
+  border:none;border-radius:14px;font-size:18px;font-weight:700;
+  cursor:pointer;letter-spacing:0.3px;
+  box-shadow:0 4px 0 #85500a;
+}
+#overlay button:active{transform:translateY(2px);box-shadow:0 2px 0 #85500a}
+#controls{
+  width:100%;max-width:560px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px 14px;
+  gap:10px;
+  background:rgba(255,255,255,0.55);
+  border-top:1.5px solid rgba(186,117,23,0.2);
+  flex-shrink:0;
+}
+#dpad{
+  display:grid;
+  grid-template-columns:72px 72px;
+  grid-template-rows:72px;
+  gap:10px;
+}
+.dpad-btn{
+  width:72px;height:72px;
+  background:#BA7517;color:#fff;
+  border:none;border-radius:16px;
+  font-size:30px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;touch-action:none;
+  box-shadow:0 5px 0 #85500a;
+  transition:transform 0.06s,box-shadow 0.06s;
+  -webkit-user-select:none;
+}
+.dpad-btn.pressed{
+  transform:translateY(3px);
+  box-shadow:0 2px 0 #85500a;
+  background:#9c6010;
+}
+#jump-btn{
+  width:96px;height:96px;
+  background:#D4537E;color:#fff;
+  border:none;border-radius:50%;
+  font-size:15px;font-weight:800;letter-spacing:0.5px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;touch-action:none;
+  box-shadow:0 6px 0 #993556;
+  transition:transform 0.06s,box-shadow 0.06s;
+  -webkit-user-select:none;
+  flex-shrink:0;
+}
+#jump-btn.pressed{
+  transform:translateY(4px);
+  box-shadow:0 2px 0 #993556;
+  background:#b83a65;
+}
+#ctrl-mid{flex:1}
+</style>
+</head>
+<body>
+
+<div id="ui-bar">
+  <span class="ui-label">🍫 Nidal</span>
+  <span id="lvl-badge">Level 1</span>
+  <span class="ui-label">❤️ <span id="lives-txt">3</span> &nbsp;|&nbsp; ⭐ <span id="score-txt">0</span></span>
+</div>
+
+<div id="canvas-wrap">
+  <canvas id="canvas"></canvas>
+  <div id="overlay">
+    <div class="ov-icon">🍫</div>
+    <h2>Nidal!</h2>
+    <p>Help Cookie collect all the chocolates while dodging the caramel blobs!</p>
+    <button id="start-btn">▶ Play Now</button>
+  </div>
+</div>
+
+<div id="controls">
+  <div id="dpad">
+    <button class="dpad-btn" id="t-left" aria-label="Move left">◀</button>
+    <button class="dpad-btn" id="t-right" aria-label="Move right">▶</button>
+  </div>
+  <div id="ctrl-mid"></div>
+  <button id="jump-btn" aria-label="Jump">JUMP</button>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const startBtn = document.getElementById('start-btn');
+const lvlBadge = document.getElementById('lvl-badge');
+const livesTxt = document.getElementById('lives-txt');
+const scoreTxt = document.getElementById('score-txt');
+
+function resize() {
+  const wrap = document.getElementById('canvas-wrap');
+  const maxW = Math.min(window.innerWidth, 560);
+  wrap.style.width = maxW + 'px';
+  const h = wrap.getBoundingClientRect().height || maxW * 0.85;
+  canvas.width = maxW;
+  canvas.height = h;
+  W = maxW; H = h;
+}
+let W = 560, H = 480;
+window.addEventListener('resize', () => { resize(); if (gameActive) initLevel(); });
+resize();
+
+const GRAVITY = 0.45;
+let level = 1, score = 0, lives = 3, gameActive = false, animId;
+let player, platforms, chocolates, enemies, cfg, keys = {};
+
+function lvlConfig(l) {
+  const e = Math.min(l - 1, 9);
+  return { chocolates: 5 + l, enemyCount: Math.min(1 + Math.floor(l / 2), 6), enemySpeed: 1.2 + e * 0.35, chocolateFall: l >= 4, fallSpeed: 1 + e * 0.28, jumpPower: -(12 + e * 0.2) };
+}
+function generatePlatforms() {
+  const gW = canvas.width, gH = canvas.height;
+  const plats = [{ x: 0, y: gH - 40, w: gW, h: 20, color: '#BA7517' }];
+  const count = 4 + Math.min(level, 5);
+  const zoneH = (gH - 100) / count;
+  for (let i = 0; i < count; i++) {
+    const pw = 80 + Math.random() * 110;
+    plats.push({ x: 10 + Math.random() * (gW - pw - 20), y: 80 + i * zoneH + Math.random() * (zoneH * 0.4), w: pw, h: 14, color: i % 2 === 0 ? '#EF9F27' : '#BA7517' });
+  }
+  return plats;
+}
+function initLevel() {
+  cfg = lvlConfig(level); platforms = generatePlatforms();
+  const gW = canvas.width, gH = canvas.height;
+  player = { x: 50, y: gH - 120, w: 26, h: 30, vx: 0, vy: 0, onGround: false, facing: 1, fTimer: 0 };
+  chocolates = [];
+  for (let i = 0; i < cfg.chocolates; i++) chocolates.push(spawnChoc(i));
+  enemies = [];
+  for (let i = 0; i < cfg.enemyCount; i++) enemies.push({ x: 100 + i * 70, y: gH - 80, w: 24, h: 24, vx: (i % 2 === 0 ? 1 : -1) * cfg.enemySpeed, fTimer: 0 });
+}
+function spawnChoc(i) {
+  const gW = canvas.width, gH = canvas.height;
+  return { x: 40 + Math.random() * (gW - 80), y: cfg.chocolateFall ? -30 - i * 35 : 60 + Math.random() * (gH - 120), w: 18, h: 18, vy: cfg.chocolateFall ? cfg.fallSpeed + Math.random() * 0.4 : 0, collected: false, wobble: Math.random() * Math.PI * 2 };
+}
+function drawBg() {
+  ctx.fillStyle = '#FFF8EE'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(99,56,6,0.05)';
+  for (let i = 0; i < 12; i++) { ctx.beginPath(); ctx.arc(30 + i * 48, 35 + (i % 3) * 75, 8, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = '#BA7517'; ctx.fillRect(0, H - 20, W, 20);
+  ctx.fillStyle = '#EF9F27';
+  for (let i = 0; i < 15; i++) { ctx.beginPath(); ctx.arc(16 + i * 38, H - 15, 5, 0, Math.PI * 2); ctx.fill(); }
+}
+function drawPlatform(p) {
+  ctx.fillStyle = p.color; roundRect(ctx, p.x, p.y, p.w, p.h, 6);
+  ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fillRect(p.x + 6, p.y + 3, p.w - 12, 4);
+}
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath(); c.moveTo(x + r, y); c.lineTo(x + w - r, y); c.arcTo(x + w, y, x + w, y + r, r);
+  c.lineTo(x + w, y + h - r); c.arcTo(x + w, y + h, x + w - r, y + h, r);
+  c.lineTo(x + r, y + h); c.arcTo(x, y + h, x, y + h - r, r);
+  c.lineTo(x, y + r); c.arcTo(x, y, x + r, y, r); c.closePath(); c.fill();
+}
+function drawPlayer() {
+  const p = player, s = Math.min(W, H) / 520;
+  ctx.save(); ctx.translate(p.x + p.w / 2, p.y + p.h / 2);
+  if (p.facing < 0) ctx.scale(-1, 1); ctx.scale(s * 1.1, s * 1.1);
+  ctx.fillStyle = '#7F4520'; ctx.beginPath(); ctx.ellipse(0, 4, 11, 13, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#D4537E'; ctx.beginPath(); ctx.ellipse(0, 10, 12, 7, 0, 0, Math.PI); ctx.fill();
+  ctx.fillStyle = '#F5C4B3'; ctx.beginPath(); ctx.ellipse(0, -10, 10, 10, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#4A1B0C';
+  ctx.beginPath(); ctx.arc(-8, -17, 5.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(8, -17, 5.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, -13, 10, 6, 0, 0, Math.PI, true); ctx.fill();
+  ctx.fillStyle = '#412402';
+  ctx.beginPath(); ctx.arc(-4, -10, 2.2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(4, -10, 2.2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(-3.4, -10.5, 0.7, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(4.6, -10.5, 0.7, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(212,83,126,0.35)';
+  ctx.beginPath(); ctx.ellipse(-5.5, -7, 3.5, 2, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(5.5, -7, 3.5, 2, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#993556'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, -6, 3.5, 0.2, Math.PI - 0.2); ctx.stroke();
+  const ab = Math.sin(p.fTimer * 0.2) * 0.3;
+  ctx.strokeStyle = '#7F4520'; ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-10, 2); ctx.lineTo(-14, 8 + ab * 7); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(10, 2); ctx.lineTo(14, 8 + ab * 7); ctx.stroke();
+  const leg = p.onGround ? Math.sin(p.fTimer * 0.25) * 7 : 0;
+  ctx.strokeStyle = '#7F4520'; ctx.lineWidth = 4.5;
+  ctx.beginPath(); ctx.moveTo(-4, 14); ctx.lineTo(-6, 21 + leg); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(4, 14); ctx.lineTo(6, 21 - leg); ctx.stroke();
+  ctx.fillStyle = '#4A1B0C';
+  ctx.beginPath(); ctx.ellipse(-6, 23 + leg, 4.5, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(6, 23 - leg, 4.5, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+function drawEnemy(e) {
+  const s = Math.min(W, H) / 520;
+  ctx.save(); ctx.translate(e.x + e.w / 2, e.y + e.h / 2);
+  if (e.vx > 0) ctx.scale(-1, 1); ctx.scale(s * 1.05, s * 1.05);
+  const bob = Math.sin(e.fTimer * 0.15) * 2;
+  ctx.fillStyle = '#EF9F27'; ctx.beginPath(); ctx.ellipse(0, 2 + bob, 11, 10, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#412402';
+  ctx.beginPath(); ctx.arc(-4, -1 + bob, 2.2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(4, -1 + bob, 2.2, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#412402'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-6, -4 + bob); ctx.lineTo(-2, -2 + bob); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(6, -4 + bob); ctx.lineTo(2, -2 + bob); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 4 + bob, 3, Math.PI + 0.3, -0.3); ctx.stroke();
+  ctx.fillStyle = '#BA7517';
+  ctx.beginPath(); ctx.ellipse(-5, 11 + bob, 2.5, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(5, 11 + bob, 2.5, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+function drawChoc(c) {
+  if (c.collected) return;
+  const s = Math.min(W, H) / 520;
+  ctx.save(); ctx.translate(c.x + 9, c.y + 9); ctx.rotate(Math.sin(c.wobble) * 0.08); ctx.scale(s * 1.1, s * 1.1);
+  ctx.fillStyle = '#633806'; roundRect(ctx, -9, -9, 18, 18, 4);
+  ctx.strokeStyle = '#412402'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(1, -9); ctx.lineTo(1, 9); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-9, 1); ctx.lineTo(9, 1); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.beginPath(); ctx.ellipse(-2, -3, 2.5, 1.5, -0.5, 0, Math.PI * 2); ctx.fill();
+  ctx.restore(); c.wobble += 0.05;
+}
+function collides(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+function update() {
+  if (!gameActive) return;
+  const p = player; p.fTimer++;
+  const speed = (W / 520) * (3.8 + level * 0.12);
+  p.vx = 0;
+  if (keys['ArrowLeft'] || keys['a'] || keys['A']) { p.vx = -speed; p.facing = -1; }
+  if (keys['ArrowRight'] || keys['d'] || keys['D']) { p.vx = speed; p.facing = 1; }
+  if ((keys['ArrowUp'] || keys['w'] || keys['W'] || keys[' ']) && p.onGround) { p.vy = cfg.jumpPower; p.onGround = false; }
+  p.vy += GRAVITY; p.x += p.vx; p.y += p.vy;
+  p.x = Math.max(0, Math.min(W - p.w, p.x));
+  p.onGround = false;
+  for (const pl of platforms) {
+    if (p.vy >= 0 && p.x + p.w > pl.x && p.x < pl.x + pl.w && p.y + p.h > pl.y && p.y + p.h < pl.y + pl.h + 14) {
+      p.y = pl.y - p.h; p.vy = 0; p.onGround = true;
+    }
+  }
+  if (p.y > H + 80) { loseLife(); return; }
+  for (const e of enemies) {
+    e.fTimer++; e.x += e.vx;
+    if (e.x < 0 || e.x + e.w > W) e.vx *= -1;
+    let onG = false;
+    for (const pl of platforms) {
+      if (e.x + e.w > pl.x && e.x < pl.x + pl.w && e.y + e.h >= pl.y && e.y + e.h <= pl.y + 16) { e.y = pl.y - e.h; onG = true; }
+    }
+    if (!onG) { e.y += 0.5; if (e.y > H - 50) e.y = H - 50; }
+    if (collides(player, e)) { loseLife(); return; }
+  }
+  for (const c of chocolates) {
+    if (c.collected) continue;
+    if (cfg.chocolateFall) { c.y += c.vy; if (c.y > H) { c.y = -20; c.x = 30 + Math.random() * (W - 60); } }
+    if (collides(player, { x: c.x, y: c.y, w: c.w, h: c.h })) {
+      c.collected = true; score += 10 * level; scoreTxt.textContent = score;
+      try { if (navigator.vibrate) navigator.vibrate(40); } catch(err){}
+    }
+  }
+  if (chocolates.filter(c => !c.collected).length === 0) {
+    if (level < 10) { level++; lvlBadge.textContent = 'Level ' + level; initLevel(); }
+    else showOverlay('🎉 You Won!', 'You completed all 10 levels!', '▶ Play Again', true);
+  }
+}
+function draw() {
+  ctx.clearRect(0, 0, W, H); drawBg();
+  for (const p of platforms) drawPlatform(p);
+  for (const c of chocolates) drawChoc(c);
+  for (const e of enemies) drawEnemy(e);
+  drawPlayer();
+  const rem = chocolates.filter(c => !c.collected).length;
+  ctx.fillStyle = 'rgba(65,36,2,0.72)'; roundRect(ctx, 8, 8, 130, 30, 8);
+  ctx.fillStyle = 'white'; ctx.font = 'bold 13px system-ui,sans-serif'; ctx.fillText('🍫 Collect: ' + rem, 16, 28);
+}
+function loop() { update(); draw(); animId = requestAnimationFrame(loop); }
+function loseLife() {
+  lives--; livesTxt.textContent = lives;
+  try { if (navigator.vibrate) navigator.vibrate(120); } catch(err){}
+  if (lives <= 0) showOverlay('💔 Game Over', 'You ran out of lives! Try again.', '▶ Try Again', false);
+  else { player.x = 50; player.y = H - 120; player.vx = 0; player.vy = 0; }
+}
+function showOverlay(title, msg, btn, win) {
+  gameActive = false; cancelAnimationFrame(animId);
+  overlay.innerHTML = `<div class="ov-icon">${win ? '🎉' : '💔'}</div><h2>${title}</h2><p>${msg}</p><button id="start-btn">${btn}</button>`;
+  overlay.style.display = 'flex';
+  document.getElementById('start-btn').onclick = startGame;
+}
+function startGame() {
+  level = 1; score = 0; lives = 3;
+  lvlBadge.textContent = 'Level 1'; livesTxt.textContent = '3'; scoreTxt.textContent = '0';
+  overlay.style.display = 'none'; resize(); initLevel(); gameActive = true;
+  cancelAnimationFrame(animId); loop();
+}
+startBtn.onclick = startGame;
+window.addEventListener('keydown', e => { keys[e.key] = true; if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); });
+window.addEventListener('keyup', e => { keys[e.key] = false; });
+function addHoldTouch(id, key) {
+  const btn = document.getElementById(id);
+  function press(e) { e.preventDefault(); keys[key] = true; btn.classList.add('pressed'); }
+  function release(e) { e.preventDefault(); keys[key] = false; btn.classList.remove('pressed'); }
+  btn.addEventListener('touchstart',  press,   { passive: false });
+  btn.addEventListener('touchend',    release, { passive: false });
+  btn.addEventListener('touchcancel', release, { passive: false });
+  btn.addEventListener('mousedown',   press,   { passive: false });
+  btn.addEventListener('mouseup',     release, { passive: false });
+  btn.addEventListener('mouseleave',  release, { passive: false });
+  btn.addEventListener('contextmenu', e => e.preventDefault());
+}
+addHoldTouch('t-left',   'ArrowLeft');
+addHoldTouch('t-right',  'ArrowRight');
+addHoldTouch('jump-btn', ' ');
+</script>
+</body>
+</html>
