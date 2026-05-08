@@ -1,0 +1,9 @@
+{
+  "appId": "com.nidal.game",
+  "appName": "Nidal",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}
